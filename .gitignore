@@ -1,0 +1,9 @@
+sampleA/
+sampleB/
+compiled-MEngTracker/x64/
+x64/
+compiled-MEngTracker.sln
+.vs/compiled-MEngTracker/v14/.suo
+compiled-MEngTracker/old demo code/
+compiled-MEngTracker/compiled-MEngTracker.vcxproj
+compiled-MEngTracker/compiled-MEngTracker.vcxproj.filters
