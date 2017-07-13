@@ -41,7 +41,6 @@ void overlayImage(cv::Mat* src, cv::Mat* overlay, const cv::Point location = cv:
 int main(int argc, char *argv[])
 {
 	std::string filename = cv_makeFilename(".\\sampleA\\result_", 1, PNG);
-
 	image_model = cv::imread(filename);
 	cv::Mat quad_img = cv::imread("MEngShowcase.png", -1);
 	if (image_model.empty() | quad_img.empty())
