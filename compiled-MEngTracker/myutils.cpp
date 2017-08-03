@@ -335,7 +335,7 @@ inline float mod(float x, float y)
 void saveMatToCsv(cv::Mat &matrix, std::string filename)
 {
 	std::ofstream outputFile(filename);
-	outputFile << cv::format(matrix, 2) << std::endl;
+	outputFile << cv::format(matrix, cv::Formatter::FMT_CSV) << std::endl;
 	outputFile.close();
 }
 
@@ -447,4 +447,26 @@ cv::Mat create_homography_map(cv::Mat &img, cv::Mat &tform)
 
 	cv::Mat M = translation * tform;
 	return M;
+}
+
+std::vector<cv::Point2f> getBoundingBox(const cv::Size dsize)
+{
+	std::vector<cv::Point2f> frame_corner;
+	frame_corner.push_back(cv::Point2f(1, 1));								// tl
+	frame_corner.push_back(cv::Point2f(dsize.width, 1));					// tr
+	frame_corner.push_back(cv::Point2f(dsize.width, dsize.height));			// br
+	frame_corner.push_back(cv::Point2f(1, dsize.height));					// bl
+
+	return frame_corner;
+}
+
+std::vector<cv::Point2f> getBoundingBox(const cv::Rect2d uBox)
+{
+	vector<cv::Point2f> bb;
+	bb.push_back(cv::Point2f(static_cast<float>(uBox.x), static_cast<float>(uBox.y)));
+	bb.push_back(cv::Point2f(static_cast<float>(uBox.x + uBox.width), static_cast<float>(uBox.y)));
+	bb.push_back(cv::Point2f(static_cast<float>(uBox.x + uBox.width), static_cast<float>(uBox.y + uBox.height)));
+	bb.push_back(cv::Point2f(static_cast<float>(uBox.x), static_cast<float>(uBox.y + uBox.height)));
+
+	return bb;
 }

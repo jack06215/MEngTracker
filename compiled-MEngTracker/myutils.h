@@ -95,4 +95,5 @@ cv::Rect2d selectROI(const std::string &video_name, const cv::Mat &frame);
 
 cv::Mat create_homography_map(cv::Mat &img, cv::Mat &tform);
 
-
+std::vector<cv::Point2f> getBoundingBox(const cv::Size dsize);
+std::vector<cv::Point2f> getBoundingBox(const cv::Rect2d uBox);

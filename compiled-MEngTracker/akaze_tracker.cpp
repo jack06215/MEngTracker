@@ -110,6 +110,7 @@ void akaze_tracker::tune_akazeCV_threshold(int last_nkp)
 			threshold = AKAZE_THRESHOLD_MIN; // The aperture is fully open
 
 	this->detector_->setThreshold(threshold);
+	//std::cout << this->detector_->getThreshold() << '\n';
 }
 
 void akaze_tracker::filterKeyPoints(const std::vector<cv::Point2f> &corners,						// warped image corner
@@ -163,6 +164,116 @@ void akaze_tracker::setFirstFrame(const cv::Mat& frame, std::vector<cv::Point2f>
 	delete[] ptMask;
 	tmp_detector.release();
 	frame_bw.release();
+}
+
+static void matches2points_nndr2(const std::vector<cv::KeyPoint>& train,
+	const std::vector<cv::KeyPoint>& query,
+	const std::vector<std::vector<cv::DMatch> >& matches,
+	std::vector<cv::Point2f>& pmatches, float nndr)
+
+{
+
+	float dist1 = 0.0, dist2 = 0.0;
+	for (size_t i = 0; i < matches.size(); i++)
+	{
+		cv::DMatch dmatch = matches[i][0];
+		dist1 = matches[i][0].distance;
+		dist2 = matches[i][1].distance;
+
+		if (dist1 < nndr*dist2) {
+			pmatches.push_back(train[dmatch.queryIdx].pt);
+			pmatches.push_back(query[dmatch.trainIdx].pt);
+		}
+	}
+}
+
+static void compute_inliers_ransac2(const std::vector<cv::Point2f>& matches,
+	std::vector<cv::Point2f>& inliers,
+	float error)
+{
+	std::vector<cv::Point2f> points1, points2;
+	cv::Mat H = cv::Mat::zeros(3, 3, CV_32F);
+	int npoints = matches.size() / 2;
+	cv::Mat status = cv::Mat::zeros(npoints, 1, CV_8UC1);
+
+	for (size_t i = 0; i < matches.size(); i += 2)
+	{
+		points1.push_back(matches[i]);
+		points2.push_back(matches[i + 1]);
+	}
+
+	if (npoints > 8)
+	{
+		H = cv::findHomography(points1, points2, cv::RANSAC, error, status);
+
+		for (int i = 0; i < npoints; i++)
+		{
+			if (status.at<unsigned char>(i) == 1)
+			{
+				inliers.push_back(points1[i]);
+				inliers.push_back(points2[i]);
+			}
+		}
+	}
+}
+
+
+void akaze_tracker::matching2(const std::vector<cv::KeyPoint>& train,
+	const std::vector<cv::KeyPoint>& query,
+	const std::vector<std::vector<cv::DMatch> >& matches,
+	std::vector<cv::Point2f>& pmatches, float nndr, float error)
+{
+	std::vector<cv::Point2f> inliers;
+	matches2points_nndr2(train, query, matches, pmatches, nndr);
+	compute_inliers_ransac2(pmatches, inliers, error);
+	std::vector<cv::Point2f> pts1;
+	std::vector<cv::Point2f> pts2;
+	//std::cout << "inlier size" << inliers.size() << '\n';
+	for (size_t i = 0; i < inliers.size(); i += 2)
+	{
+		cv::Point2f pts_tmp;
+		pts_tmp.x = (int)(inliers[i].x + .5);
+		pts_tmp.y = (int)(inliers[i].y + .5);
+		pts1.push_back(pts_tmp);
+
+		pts_tmp.x = (int)(inliers[i + 1].x + .5);
+		pts_tmp.y = (int)(inliers[i + 1].y + .5);
+		pts2.push_back(pts_tmp);
+	}
+
+	// find correspondance between consecutive frames, and deduce the pose homography of the current frame
+	cv::Mat HG = findHomography(pts1, pts2);
+	vector<cv::Point2f> new_bb;
+	perspectiveTransform(this->object_bb, new_bb, HG);
+	//for (int i = 0; i < new_bb.size(); i++)
+	//{
+	//	std::cout << new_bb[i] << '\n';
+	//}
+	this->result.boundingBox = new_bb;
+	this->result.homography = HG;
+
+}
+
+tracker_result akaze_tracker::process2(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option)
+{
+	using namespace tracker_options;
+	tracker_result result;
+	std::vector<cv::DMatch> good_matches;
+	vector<cv::KeyPoint> inliers1, inliers2;
+	vector<cv::DMatch> inlier_matches;
+	std::vector<cv::KeyPoint> frame_keypoints;
+
+
+	this->detection2(frame, bb, good_matches, frame_keypoints);
+
+
+	inlier_matches.clear();
+	inliers1.clear();
+	inliers2.clear();
+	good_matches.clear();
+	frame_keypoints.clear();
+
+	return result;
 }
 
 tracker_result akaze_tracker::process(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option)
@@ -288,6 +399,38 @@ void akaze_tracker::robustDetection(const cv::Mat& frame, const std::vector<cv::
 	symmetryTest(matches12, matches21, good_matches);
 	frame_bw.release();
 
+}
+
+void akaze_tracker::detection2(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame)
+{
+	good_matches.clear();
+	static int last_nkp = 0;
+	if (this->dynamic_threshold)
+	{
+		tune_akazeCV_threshold(last_nkp);
+	}
+	cv::Mat frame_bw;
+	if (frame.channels() > 1)
+		toGray(frame, frame_bw);
+
+	else
+		frame.copyTo(frame_bw);
+
+	// 1a. Detection of the AKAZE features
+	this->computeKeyPoints(frame_bw, keypoints_frame);
+	filterKeyPoints(frame_corners, keypoints_frame);
+	last_nkp = keypoints_frame.size();
+	// 1b. Extraction of the AKAZE descriptors
+	cv::Mat descriptors_frame;
+	std::vector<cv::Point2f> pmatches;
+	this->computeDescriptors(frame_bw, keypoints_frame, descriptors_frame);
+
+	// 2. Match the two image descriptors
+	std::vector<std::vector<cv::DMatch> > matches;
+	matcher_->knnMatch(descriptors_frame, model_desc_, matches, 2);
+
+	matching2(this->model_kpts_, keypoints_frame, matches, pmatches, 0.8f, 2.5f);
+	frame_bw.release();
 }
 
 void akaze_tracker::detection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame)

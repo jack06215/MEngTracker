@@ -19,9 +19,9 @@ void Kalman::initialize(int numPts)
 		KalmanFilter KF(4, 2, 0);
 		//A matrix
 		KF.transitionMatrix = (Mat_<float>(4, 4) << 1, 0, 1, 0,
-			0, 1, 0, 1,
-			0, 0, 1, 0,
-			0, 0, 0, 1);
+													0, 1, 0, 1,
+													0, 0, 1, 0,
+													0, 0, 0, 1);
 		setIdentity(KF.measurementMatrix);
 
 

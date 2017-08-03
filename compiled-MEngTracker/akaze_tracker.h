@@ -37,7 +37,8 @@ class akaze_tracker
 public:
 	akaze_tracker() : ratio_(0.8), dynamic_threshold(true)
 	{
-		detector_ = cv::AKAZE2::create();
+		detector_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, 64, 3, 0.1f, 3, 1);
+		//AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, FRONTAL_DESCRIPTOR_SIZE, FRONTAL_DESCRIPTOR_CH, FRONTAL_THRESHOLD_MAX, FRONTAL_NUM_OCTAVES, FRONTAL_NUM_OCTAVE_SUBLAYERS);
 		extractor_ = cv::AKAZE2::create();
 		matcher_ = cv::DescriptorMatcher::create("BruteForce-Hamming");
 	}
@@ -46,7 +47,14 @@ public:
 	void matching(std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& frame_keypoints,
 		std::vector<cv::KeyPoint>& inliers1, std::vector<cv::KeyPoint>& inliers2, std::vector<cv::DMatch>& inlier_matches);
 	void detection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
+	void matching2(const std::vector<cv::KeyPoint>& train,
+		const std::vector<cv::KeyPoint>& query,
+		const std::vector<std::vector<cv::DMatch> >& matches,
+		std::vector<cv::Point2f>& pmatches, float nndr, float error);
 	void robustDetection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
+	tracker_result process2(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option);
+	void detection2(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
+	
 	tracker_result process(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option);
 	tracker_result result;
 	
