@@ -10,11 +10,18 @@ akaze_tracker::~akaze_tracker()
 void akaze_tracker::computeKeyPoints(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints)
 {
 	detector_->detect(image, keypoints);
+	//std::cout << keypoints.size() << '\n';
+
 }
 
 void akaze_tracker::computeDescriptors(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors)
 {
 	extractor_->compute(image, keypoints, descriptors);
+}
+
+void akaze_tracker::detectAndCompute(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors)
+{
+	detector_->detectAndCompute(image, cv::noArray(), keypoints, descriptors);
 }
 
 int akaze_tracker::ratioTest(std::vector<std::vector<cv::DMatch> > &matches)
@@ -79,7 +86,6 @@ void akaze_tracker::symmetryTest(const std::vector<std::vector<cv::DMatch> >& ma
 		}
 	}
 }
-
 void akaze_tracker::tune_akazeCV_threshold(int last_nkp)
 {
 	if (AKAZE_KPCOUNT_MIN <= last_nkp && last_nkp <= AKAZE_KPCOUNT_MAX)
@@ -95,23 +101,57 @@ void akaze_tracker::tune_akazeCV_threshold(int last_nkp)
 	const double target_y = log10(target_nkp);
 
 	// Some negative number; closer to 0 means finer and slower to approach the target
-	const double slope = -1.0;
+	const double slope = -0.5;
 
-	double x = log10(this->detector_->getThreshold());
+	double x = log10(this->detector_->getHessianThreshold());
 	double y = log10(last_nkp + 1.0);
 
 	x = x + slope * (target_y - y);
 	double threshold = exp(x * log(10.0));
+	//std::cout << threshold << '\n';
 
-	if (threshold > AKAZE_THRESHOLD_MAX)
-		threshold = AKAZE_THRESHOLD_MAX; // The aperture is closed
+
+	if (threshold > 500)
+		threshold = 500; // The aperture is closed
 	else
-		if (threshold < AKAZE_THRESHOLD_MIN)
-			threshold = AKAZE_THRESHOLD_MIN; // The aperture is fully open
+		if (threshold < 100)
+			threshold = 100; // The aperture is fully open
 
-	this->detector_->setThreshold(threshold);
+	this->detector_->setHessianThreshold(threshold);
 	//std::cout << this->detector_->getThreshold() << '\n';
 }
+//void akaze_tracker::tune_akazeCV_threshold(int last_nkp)
+//{
+//	if (AKAZE_KPCOUNT_MIN <= last_nkp && last_nkp <= AKAZE_KPCOUNT_MAX)
+//		return;
+//
+//	/*
+//	By converting the parameters as y = log10(nkp+1), x = log10(threshold),
+//	a simple fitting line, y = a * x + b, can be assumed to find out
+//	the threshold to give the target nkp
+//	*/
+//
+//	const double target_nkp = 0.5 * (AKAZE_KPCOUNT_MAX + AKAZE_KPCOUNT_MIN);
+//	const double target_y = log10(target_nkp);
+//
+//	// Some negative number; closer to 0 means finer and slower to approach the target
+//	const double slope = -1.0;
+//
+//	double x = log10(this->detector_->getThreshold());
+//	double y = log10(last_nkp + 1.0);
+//
+//	x = x + slope * (target_y - y);
+//	double threshold = exp(x * log(10.0));
+//
+//	if (threshold > AKAZE_THRESHOLD_MAX)
+//		threshold = AKAZE_THRESHOLD_MAX; // The aperture is closed
+//	else
+//		if (threshold < AKAZE_THRESHOLD_MIN)
+//			threshold = AKAZE_THRESHOLD_MIN; // The aperture is fully open
+//
+//	this->detector_->setThreshold(threshold);
+//	//std::cout << this->detector_->getThreshold() << '\n';
+//}
 
 void akaze_tracker::filterKeyPoints(const std::vector<cv::Point2f> &corners,						// warped image corner
 									std::vector<cv::KeyPoint> &keypoints)							// warped keypoints
@@ -147,7 +187,8 @@ void akaze_tracker::setFirstFrame(const cv::Mat& frame, std::vector<cv::Point2f>
 	else
 		frame.copyTo(frame_bw);
 
-	cv::Ptr<cv::AKAZE2> tmp_detector = cv::AKAZE2::create();
+	//cv::Ptr<cv::AKAZE2> tmp_detector =  cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, AKAZE_DESCRIPTOR_SIZE, AKAZE_DESCRIPTOR_CH, 0.01f, AKAZE_NUM_OCTAVES, AKAZE_NUM_OCTAVE_SUBLAYERS);
+	cv::Ptr<cv::xfeatures2d::SURF> tmp_detector = cv::xfeatures2d::SURF::create(100.0, 4, 3, false, true);
 	cv::Point *ptMask = new cv::Point[bb.size()];
 	const cv::Point* ptContain = { &ptMask[0] };
 	int iSize = static_cast<int>(bb.size());
@@ -158,7 +199,9 @@ void akaze_tracker::setFirstFrame(const cv::Mat& frame, std::vector<cv::Point2f>
 	}
 	cv::Mat matMask = cv::Mat::zeros(frame_bw.size(), CV_8UC1);
 	cv::fillPoly(matMask, &ptContain, &iSize, 1, cv::Scalar::all(255));
-	tmp_detector->detectAndCompute(frame_bw, matMask, model_kpts_, model_desc_);
+	//tmp_detector->detectAndCompute(frame_bw, matMask, model_kpts_, model_desc_);
+	tmp_detector->detectAndCompute(frame_bw, cv::noArray(), model_kpts_, model_desc_);
+	//std::cout << model_kpts_.size() << '\n';
 
 	object_bb = bb;
 	delete[] ptMask;
@@ -297,6 +340,7 @@ tracker_result akaze_tracker::process(const cv::Mat& frame, std::vector<cv::Poin
 		this->robustDetection(frame, bb, good_matches, frame_keypoints);
 		break;
 	}
+#if 1
 	this->matching(good_matches, frame_keypoints, inliers1, inliers2, inlier_matches);
 
 	if (inlier_matches.size())
@@ -309,6 +353,7 @@ tracker_result akaze_tracker::process(const cv::Mat& frame, std::vector<cv::Poin
 		result.inliers2 = inliers2;
 		result.inlier_matches = inlier_matches;
 	}
+#endif
 	inlier_matches.clear();
 	inliers1.clear();
 	inliers2.clear();
@@ -447,19 +492,24 @@ void akaze_tracker::detection(const cv::Mat& frame, const std::vector<cv::Point2
 
 	else
 		frame.copyTo(frame_bw);
-
+	
+	cv::Mat descriptors_frame;
+	//std::cout << this->detector_->getHessianThreshold() << '\n';
 	// 1a. Detection of the AKAZE features
 	this->computeKeyPoints(frame_bw, keypoints_frame);
+	
 	filterKeyPoints(frame_corners, keypoints_frame);
-	last_nkp = keypoints_frame.size();
+	last_nkp = (int)keypoints_frame.size();
 	// 1b. Extraction of the AKAZE descriptors
-	cv::Mat descriptors_frame;
 	this->computeDescriptors(frame_bw, keypoints_frame, descriptors_frame);
 
+	//this->detectAndCompute(frame_bw, keypoints_frame, descriptors_frame);
+	//std::cout << descriptors_frame.size() << '\n';
+#if 1
 	// 2. Match the two image descriptors
 	std::vector<std::vector<cv::DMatch> > matches;
 	matcher_->knnMatch(descriptors_frame, model_desc_, matches, 2);
-
+	//std::cout << "yyyyyyyyyyyy" << '\n';
 	// 3. Remove matches for which NN ratio is > than threshold
 	ratioTest(matches);
 
@@ -470,5 +520,6 @@ void akaze_tracker::detection(const cv::Mat& frame, const std::vector<cv::Point2
 		if (!matchIterator->empty()) 
 			good_matches.push_back((*matchIterator)[0]);
 	}
+#endif
 	frame_bw.release();
 }

@@ -4,8 +4,15 @@
 #include <opencv2/core/core.hpp>
 #include <opencv2/highgui/highgui.hpp>
 #include <opencv2/features2d/features2d.hpp>
+#include <opencv2/xfeatures2d/nonfree.hpp>
 
 #include "features2d_akaze2.hpp"
+
+// Akaze parameters
+#define AKAZE_DESCRIPTOR_SIZE            0     /* 64 or 256 or 486 bits; 0 means full and 486 bits in case of three channels */
+#define AKAZE_DESCRIPTOR_CH              3      /* 1 or 2 or 3; The descriptor size must be <= 162*CH */
+#define AKAZE_NUM_OCTAVES                4
+#define AKAZE_NUM_OCTAVE_SUBLAYERS       4
 
 // dynamic threshold adjusting parameters (according to the target keypoint range)
 #define AKAZE_KPCOUNT_MIN                140
@@ -37,10 +44,11 @@ class akaze_tracker
 public:
 	akaze_tracker() : ratio_(0.8), dynamic_threshold(true)
 	{
-		detector_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, 64, 3, 0.1f, 3, 1);
-		//AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, FRONTAL_DESCRIPTOR_SIZE, FRONTAL_DESCRIPTOR_CH, FRONTAL_THRESHOLD_MAX, FRONTAL_NUM_OCTAVES, FRONTAL_NUM_OCTAVE_SUBLAYERS);
-		extractor_ = cv::AKAZE2::create();
-		matcher_ = cv::DescriptorMatcher::create("BruteForce-Hamming");
+		//detector_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, AKAZE_DESCRIPTOR_SIZE,AKAZE_DESCRIPTOR_CH,0.01f, AKAZE_NUM_OCTAVES, AKAZE_NUM_OCTAVE_SUBLAYERS);
+		//extractor_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, AKAZE_DESCRIPTOR_SIZE, AKAZE_DESCRIPTOR_CH, 0.01f, AKAZE_NUM_OCTAVES, AKAZE_NUM_OCTAVE_SUBLAYERS);
+		detector_ = cv::xfeatures2d::SURF::create(100.0, 4, 3, false, true);
+		extractor_ = cv::xfeatures2d::SURF::create();
+		matcher_ = cv::DescriptorMatcher::create("FlannBased");
 	}
 	virtual ~akaze_tracker();
 	void setFirstFrame(const cv::Mat& frame, std::vector<cv::Point2f> bb);
@@ -60,6 +68,7 @@ public:
 	
 
 protected:
+	void detectAndCompute(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors);
 	void computeKeyPoints(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints);
 	void computeDescriptors(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors);
 	int ratioTest(std::vector<std::vector<cv::DMatch> > &matches);
@@ -68,8 +77,8 @@ protected:
 	void filterKeyPoints(const std::vector<cv::Point2f> &corners, std::vector<cv::KeyPoint> &keypoints);
 
 private:
-	cv::Ptr<cv::AKAZE2> detector_;
-	cv::Ptr<cv::AKAZE2> extractor_;
+	cv::Ptr<cv::xfeatures2d::SURF> detector_;
+	cv::Ptr<cv::xfeatures2d::SURF> extractor_;
 	cv::Ptr<cv::DescriptorMatcher> matcher_;
 	std::vector<cv::KeyPoint> model_kpts_;
 	cv::Mat model_desc_;

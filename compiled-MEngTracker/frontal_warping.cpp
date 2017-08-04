@@ -141,9 +141,6 @@ void frontal_warping::akaze2_frontal_warping(cvMat_pair &img_current,
 		// matching
 		matcher_l2->knnMatch(desc_current.second, desc_current.first, dmatches, 2);
 		matches2points_nndr(kp_current.second, kp_current.first, dmatches, matches, 0.80f);
-
-		//std::cout << kp_current.first.size() << "\t" << kp_current.second.size() << '\n';
-
 		compute_inliers_ransac(matches, inliers, 2.5f);
 		std::vector<cv::Point2f> pts1;
 		std::vector<cv::Point2f> pts2;
@@ -165,7 +162,6 @@ void frontal_warping::akaze2_frontal_warping(cvMat_pair &img_current,
 		H_10 = H_10 * HG.inv(); // (current F to frontal) * (inverse of current and its consecutive one)
 
 		cv::Mat frontal_est;
-		//rotate_camera(img_current, warp_current, H_10);
 		homography_warp2(img_current.first, H_10, warp_current.first);
 	}
 	tmp_imgCurrent.release();
