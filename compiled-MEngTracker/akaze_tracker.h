@@ -31,7 +31,7 @@ typedef struct
 {
 	// Detection result
 	std::vector<cv::Point2f> boundingBox;	// Bounding box of tracking result in current frame
-	cv::Mat homography;					// Transformation from reference to current frame
+	cv::Mat homography;						// Transformation from reference to current frame
 	
 	// For drawMatches() function
 	std::vector<cv::KeyPoint> inliers1;
@@ -46,27 +46,18 @@ public:
 	{
 		//detector_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, AKAZE_DESCRIPTOR_SIZE,AKAZE_DESCRIPTOR_CH,0.01f, AKAZE_NUM_OCTAVES, AKAZE_NUM_OCTAVE_SUBLAYERS);
 		//extractor_ = cv::AKAZE2::create(cv::AKAZE::DESCRIPTOR_MLDB, AKAZE_DESCRIPTOR_SIZE, AKAZE_DESCRIPTOR_CH, 0.01f, AKAZE_NUM_OCTAVES, AKAZE_NUM_OCTAVE_SUBLAYERS);
-		detector_ = cv::xfeatures2d::SURF::create(100.0, 4, 3, false, true);
-		extractor_ = cv::xfeatures2d::SURF::create();
-		matcher_ = cv::DescriptorMatcher::create("FlannBased");
+		detector_ = cv::FastFeatureDetector::create();
+		extractor_ = cv::BRISK::create();
+		matcher_ = cv::DescriptorMatcher::create("BruteForce-Hamming");
 	}
 	virtual ~akaze_tracker();
-	void setFirstFrame(const cv::Mat& frame, std::vector<cv::Point2f> bb);
+	void setFirstFrame(cv::Mat& frame, std::vector<cv::Point2f> bb);
 	void matching(std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& frame_keypoints,
 		std::vector<cv::KeyPoint>& inliers1, std::vector<cv::KeyPoint>& inliers2, std::vector<cv::DMatch>& inlier_matches);
 	void detection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
-	void matching2(const std::vector<cv::KeyPoint>& train,
-		const std::vector<cv::KeyPoint>& query,
-		const std::vector<std::vector<cv::DMatch> >& matches,
-		std::vector<cv::Point2f>& pmatches, float nndr, float error);
-	void robustDetection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
-	tracker_result process2(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option);
-	void detection2(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);
-	
+	void robustDetection(const cv::Mat& frame, const std::vector<cv::Point2f>& frame_corners, std::vector<cv::DMatch>& good_matches, std::vector<cv::KeyPoint>& keypoints_frame);	
 	tracker_result process(const cv::Mat& frame, std::vector<cv::Point2f> bb, tracker_options::detection option);
 	tracker_result result;
-	
-
 protected:
 	void detectAndCompute(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints, cv::Mat& descriptors);
 	void computeKeyPoints(const cv::Mat& image, std::vector<cv::KeyPoint>& keypoints);
@@ -75,16 +66,13 @@ protected:
 	void symmetryTest(const std::vector<std::vector<cv::DMatch> >& matches1, const std::vector<std::vector<cv::DMatch> >& matches2, std::vector<cv::DMatch>& symMatches);
 	void tune_akazeCV_threshold(int last_nkp);
 	void filterKeyPoints(const std::vector<cv::Point2f> &corners, std::vector<cv::KeyPoint> &keypoints);
-
 private:
-	cv::Ptr<cv::xfeatures2d::SURF> detector_;
-	cv::Ptr<cv::xfeatures2d::SURF> extractor_;
+	cv::Ptr<cv::FastFeatureDetector> detector_;
+	cv::Ptr<cv::BRISK> extractor_;
 	cv::Ptr<cv::DescriptorMatcher> matcher_;
 	std::vector<cv::KeyPoint> model_kpts_;
 	cv::Mat model_desc_;
 	std::vector<cv::Point2f> object_bb;
-
-
 	float ratio_;
 	float akaze_threshold;
 	bool dynamic_threshold;
